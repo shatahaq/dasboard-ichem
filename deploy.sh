@@ -40,16 +40,29 @@ echo "✅ System Dependencies Verified!"
 
 # 1. Setup Python Virtual Environment
 echo "🐍 Setting up Python ML Service..."
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    echo "Created virtual environment 'venv'"
+
+# Remove broken venv if exists
+if [ -d "venv" ]; then
+    if [ ! -f "venv/bin/activate" ]; then
+        echo "⚠️  Broken venv detected. Recreating..."
+        rm -rf venv
+    fi
 fi
 
-# Activate venv and install requirements
-source venv/bin/activate
-pip install -r ml_requirements.txt
+if [ ! -d "venv" ]; then
+    python3 -m venv venv --without-pip
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+    ./venv/bin/python3 get-pip.py
+    rm get-pip.py
+    echo "✅ Created virtual environment 'venv'"
+fi
+
+# Install requirements using venv python explicitly
+echo "📥 Installing Python requirements..."
+./venv/bin/python3 -m pip install -r ml_requirements.txt
+
 # Check if pandas/flask installed correctly
-python3 -c "import pandas; import flask; print('Python dependencies verified')" || { echo "❌ Failed to install Python dependencies"; exit 1; }
+./venv/bin/python3 -c "import pandas; import flask; print('✅ Python dependencies verified')" || { echo "❌ Failed to install Python dependencies"; exit 1; }
 
 # 2. Setup Node.js Application
 echo "📦 Installing Node.js dependencies..."
