@@ -1,6 +1,42 @@
 #!/bin/bash
 
-echo "🚀 Starting I-Chem Project Deployment..."
+# One-Click Deployment Script for I-Chem Dashboard
+# Usage: ./deploy.sh
+
+echo "🚀 Starting I-Chem Deployment..."
+
+# --- SYSTEM SETUP CHECK ---
+echo "🔍 Checking System Dependencies..."
+
+# Check Node.js
+if ! command -v node &> /dev/null; then
+    echo "⚠️ Node.js not found. Installing..."
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    sudo apt install -y nodejs build-essential
+fi
+
+# Check PM2
+if ! command -v pm2 &> /dev/null; then
+    echo "⚠️ PM2 not found. Installing..."
+    sudo npm install -g pm2
+fi
+
+# Check Python Venv
+if ! dpkg -l | grep -q python3-venv; then
+    echo "⚠️ Python venv not found. Installing..."
+    sudo apt update
+    sudo apt install -y python3-pip python3-venv python3-full
+fi
+
+# Check Nginx (Optional but recommended)
+if ! command -v nginx &> /dev/null; then
+    echo "⚠️ Nginx not found. Installing..."
+    sudo apt install -y nginx
+fi
+
+echo "✅ System Dependencies Verified!"
+
+# --- PROJECT SETUP ---
 
 # 1. Setup Python Virtual Environment
 echo "🐍 Setting up Python ML Service..."
@@ -13,7 +49,7 @@ fi
 source venv/bin/activate
 pip install -r ml_requirements.txt
 # Check if pandas/flask installed correctly
-python3 -c "import pandas; import flask; print('Python dependencies verified')"
+python3 -c "import pandas; import flask; print('Python dependencies verified')" || { echo "❌ Failed to install Python dependencies"; exit 1; }
 
 # 2. Setup Node.js Application
 echo "📦 Installing Node.js dependencies..."
@@ -31,7 +67,10 @@ sed -i 's|interpreter: .*,|interpreter: "./venv/bin/python",|g' ecosystem.config
 # Start/Restart
 pm2 start ecosystem.config.js
 pm2 save
+pm2 startup | tail -n 1 > startup_script.sh && chmod +x startup_script.sh && ./startup_script.sh
 
 echo "✅ Deployment Complete!"
-echo "Web Dashboard: http://YOUR_SERVER_IP:3000"
-echo "ML Service: Process 'ichem-ml' is running in background"
+echo "---------------------------------------------------"
+echo "🌐 Web Dashboard: http://$(curl -s ifconfig.me):3000"
+echo "🧠 ML Service:    Active (Background)"
+echo "---------------------------------------------------"
