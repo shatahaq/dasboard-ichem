@@ -9,7 +9,7 @@ const axios = require('axios')
 const dev = process.env.NODE_ENV !== 'production'
 const hostname = 'localhost'
 const port = 3000
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5000'
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://127.0.0.1:5000'
 
 const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
