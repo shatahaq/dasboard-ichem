@@ -1,0 +1,21 @@
+# Defaults
+node_modules
+.next
+.DS_Store
+.env
+.env.local
+dist
+build
+coverage
+
+# Python
+__pycache__
+*.pyc
+venv/
+env/
+.pytest_cache/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

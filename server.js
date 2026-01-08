@@ -1,0 +1,103 @@
+// server.js - Custom Next.js server with Socket.io & ML predictions
+const { createServer } = require('http')
+const { parse } = require('url')
+const next = require('next')
+const { Server } = require('socket.io')
+const { getMqttClient, setMqttMessageCallback } = require('./lib/mqtt-client-cjs')
+const axios = require('axios')
+
+const dev = process.env.NODE_ENV !== 'production'
+const hostname = 'localhost'
+const port = 3000
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5000'
+
+const app = next({ dev, hostname, port })
+const handle = app.getRequestHandler()
+
+app.prepare().then(() => {
+    const httpServer = createServer(async (req, res) => {
+        try {
+            const parsedUrl = parse(req.url, true)
+            await handle(req, res, parsedUrl)
+        } catch (err) {
+            console.error('Error occurred handling', req.url, err)
+            res.statusCode = 500
+            res.end('internal server error')
+        }
+    })
+
+    // Setup Socket.io
+    const io = new Server(httpServer, {
+        cors: {
+            origin: '*',
+            methods: ['GET', 'POST']
+        }
+    })
+
+    console.log('🚀 Setting up Socket.io server...')
+
+    io.on('connection', (socket) => {
+        console.log('✅ Client connected:', socket.id)
+
+        socket.on('disconnect', () => {
+            console.log('❌ Client disconnected:', socket.id)
+        })
+    })
+
+    // Setup MQTT client and forward messages to Socket.io
+    const mqttClient = getMqttClient()
+
+    setMqttMessageCallback(async (data) => {
+        console.log('📡 ESP32 Data:', data)
+
+        // Broadcast raw sensor data
+        io.emit('sensor_data', data)
+
+        // Get ML predictions from Python service
+        try {
+            const response = await axios.post(`${ML_SERVICE_URL}/predict`, {
+                mq135_ppm: data.mq135_ppm,
+                mq2_ppm: data.mq2_ppm,
+                mq7_ppm: data.mq7_ppm
+            }, {
+                timeout: 2000
+            })
+
+            console.log('🤖 ML Predictions:', response.data)
+            io.emit('predictions', response.data)
+
+        } catch (error) {
+            console.error('❌ ML Service error:', error.message)
+
+            // Fallback to simple threshold predictions
+            const fallbackPredictions = {
+                mq135: {
+                    label: data.mq135_ppm < 200 ? 'Baik' : 'Sedang',
+                    confidence: 90
+                },
+                mq2: {
+                    label: data.mq2_ppm < 70 ? 'AMAN' : 'BAHAYA!',
+                    confidence: 90
+                },
+                mq7: {
+                    label: data.mq7_ppm < 100 ? 'NORMAL' : 'BERBAHAYA!',
+                    confidence: 90
+                }
+            }
+
+            io.emit('predictions', fallbackPredictions)
+        }
+    })
+
+    httpServer
+        .once('error', (err) => {
+            console.error(err)
+            process.exit(1)
+        })
+        .listen(port, () => {
+            console.log(`✅ Server ready on http://${hostname}:${port}`)
+            console.log('📡 MQTT client initialized')
+            console.log('🔌 Socket.io ready for connections')
+            console.log(`🤖 ML Service URL: ${ML_SERVICE_URL}`)
+        })
+})
