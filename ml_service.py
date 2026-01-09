@@ -43,8 +43,8 @@ def predict():
         data = request.json
         
         # Extract sensor values
-        temperature = float(data.get('temperature', 25))
-        humidity = float(data.get('humidity', 70))
+        temperature = float(data.get('temperature', 0))
+        humidity = float(data.get('humidity', 0))
         mq135_ppm = float(data.get('mq135_ppm', 0))
         mq2_ppm = float(data.get('mq2_ppm', 0))
         mq7_ppm = float(data.get('mq7_ppm', 0))
@@ -74,28 +74,11 @@ def predict():
         # ========== MQ-2 PREDICTION ==========
         pred_mq2 = str(model_mq2.predict([[mq2_ppm]])[0])
         conf_mq2 = float(max(model_mq2.predict_proba([[mq2_ppm]])[0]) * 100)
-        
-        # SAFETY OVERRIDE: Training data overlap issue
-        # Original data: no_smoke max ~67, smoke min ~66 (overlap!)
-        # Conservative threshold: Only predict smoke if clearly above overlap
-        if pred_mq2 == 'smoke' and mq2_ppm < 75:
-            print(f"  ⚠️  MQ-2 Override: {mq2_ppm} ppm in overlap zone, forcing NO_SMOKE")
-            pred_mq2 = 'no_smoke'
-            conf_mq2 = 85.0  # Lower confidence for override
-        
         print(f"  MQ-2: {pred_mq2} ({conf_mq2:.1f}%)")
         
         # ========== MQ-7 PREDICTION ==========
         pred_mq7 = str(model_mq7.predict([[mq7_ppm]])[0])
         conf_mq7 = float(max(model_mq7.predict_proba([[mq7_ppm]])[0]) * 100)
-        
-        # SAFETY OVERRIDE: Same issue as MQ-2
-        # Original data: no_smoke max ~100, smoke min ~99 (overlap!)
-        if pred_mq7 == 'smoke' and mq7_ppm < 105:
-            print(f"  ⚠️  MQ-7 Override: {mq7_ppm} ppm in overlap zone, forcing NO_SMOKE")
-            pred_mq7 = 'no_smoke'
-            conf_mq7 = 85.0
-        
         print(f"  MQ-7: {pred_mq7} ({conf_mq7:.1f}%)")
         
         # Map MQ-2 & MQ-7 labels to Indonesian
