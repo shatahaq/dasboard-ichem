@@ -47,6 +47,9 @@ app.prepare().then(() => {
     // Setup MQTT client and forward messages to Socket.io
     const mqttClient = getMqttClient()
 
+    // Define processed topic for publishing predictions
+    const MQTT_PROCESSED_TOPIC = 'net4think/lab_monitor/processed'
+
     setMqttMessageCallback(async (data) => {
         console.log('📡 ESP32 Data:', data)
 
@@ -56,6 +59,8 @@ app.prepare().then(() => {
         // Get ML predictions from Python service
         try {
             const response = await axios.post(`${ML_SERVICE_URL}/predict`, {
+                temperature: data.temperature,
+                humidity: data.humidity,
                 mq135_ppm: data.mq135_ppm,
                 mq2_ppm: data.mq2_ppm,
                 mq7_ppm: data.mq7_ppm
@@ -65,6 +70,27 @@ app.prepare().then(() => {
 
             console.log('🤖 ML Predictions:', response.data)
             io.emit('predictions', response.data)
+
+            // Publish predictions to MQTT
+            const processedData = {
+                timestamp: new Date().toISOString(),
+                sensor_data: {
+                    temperature: data.temperature,
+                    humidity: data.humidity,
+                    mq135_ppm: data.mq135_ppm,
+                    mq2_ppm: data.mq2_ppm,
+                    mq7_ppm: data.mq7_ppm
+                },
+                predictions: response.data
+            }
+
+            mqttClient.publish(MQTT_PROCESSED_TOPIC, JSON.stringify(processedData), { qos: 1 }, (err) => {
+                if (err) {
+                    console.error('❌ MQTT Publish error:', err)
+                } else {
+                    console.log('📤 Published to:', MQTT_PROCESSED_TOPIC)
+                }
+            })
 
         } catch (error) {
             console.error('❌ ML Service error:', error.message)
@@ -86,6 +112,15 @@ app.prepare().then(() => {
             }
 
             io.emit('predictions', fallbackPredictions)
+
+            // Also publish fallback predictions
+            const fallbackData = {
+                timestamp: new Date().toISOString(),
+                sensor_data: data,
+                predictions: fallbackPredictions,
+                source: 'fallback'
+            }
+            mqttClient.publish(MQTT_PROCESSED_TOPIC, JSON.stringify(fallbackData), { qos: 1 })
         }
     })
 
