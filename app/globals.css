@@ -4,97 +4,129 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 220 13% 18%;
-  }
-
-  @keyframes gradient {
-
-    0%,
-    100% {
-      background-position: 0% 50%;
-    }
-
-    50% {
-      background-position: 100% 50%;
-    }
-  }
-
-  @keyframes float {
-
-    0%,
-    100% {
-      transform: translateY(0px);
-    }
-
-    50% {
-      transform: translateY(-10px);
-    }
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: -1000px 0;
-    }
-
-    100% {
-      background-position: 1000px 0;
-    }
+    --background: 0 0% 100%;
+    --foreground: 0 0% 15%;
+    --primary-green: #22c55e;
+    --secondary-green: #16a34a;
+    --accent-green: #86efac;
+    --light-green: #f0fdf4;
   }
 }
 
 body {
-  @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100;
+  @apply bg-gradient-to-br from-gray-50 via-white to-green-50;
   min-height: 100vh;
-  background-size: 400% 400%;
-  animation: gradient 15s ease infinite;
+  color: #1f2937;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
 }
 
-/* Premium Glassmorphism */
-.glass-premium {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6));
-  backdrop-filter: blur(30px) saturate(150%);
-  -webkit-backdrop-filter: blur(30px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+/* Professional card styling */
+.professional-card {
+  background: white;
+  border: 1px solid rgba(34, 197, 94, 0.15);
   box-shadow:
-    0 8px 32px 0 rgba(31, 38, 135, 0.15),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    0 1px 2px rgba(34, 197, 94, 0.05);
+  transition: all 0.3s ease;
 }
 
-/* Floating Animation */
-.float {
-  animation: float 6s ease-in-out infinite;
+.professional-card:hover {
+  border-color: rgba(34, 197, 94, 0.3);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(34, 197, 94, 0.1);
+  transform: translateY(-2px);
 }
 
-/* Shimmer Effect */
-.shimmer {
-  background: linear-gradient(90deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.8) 50%,
-      rgba(255, 255, 255, 0) 100%);
-  background-size: 1000px 100%;
-  animation: shimmer 3s infinite;
+/* Green accent bar */
+.green-accent-bar {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+}
+
+/* Professional header */
+.professional-header {
+  background: white;
+  border-bottom: 3px solid #22c55e;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Status badge */
+.status-badge {
+  background: white;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Green glow for logo */
+.logo-glow {
+  box-shadow:
+    0 0 0 4px rgba(34, 197, 94, 0.1),
+    0 4px 12px rgba(34, 197, 94, 0.15);
+}
+
+/* Professional button */
+.btn-primary {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35);
+  transform: translateY(-1px);
 }
 
 /* Smooth animations */
 * {
-  @apply transition-all duration-300 ease-out;
+  @apply transition-colors duration-200;
 }
 
-/* Custom Scrollbar */
+/* Custom scrollbar - professional */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
+  background: #f9fafb;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #3b82f6, #8b5cf6);
-  border-radius: 10px;
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+  border-radius: 5px;
+  border: 2px solid #f9fafb;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #2563eb, #7c3aed);
+  background: linear-gradient(180deg, #16a34a, #15803d);
+}
+
+/* Section divider */
+.section-divider {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #22c55e, transparent);
+  opacity: 0.2;
+}
+
+/* Professional typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #1f2937;
+  font-weight: 700;
+}
+
+/* Green text gradient */
+.text-green-gradient {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

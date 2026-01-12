@@ -5,11 +5,8 @@ import { Inter } from 'next/font/google'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-    title: 'I-Chem - Net4think',
+    title: 'Lab Monitor AI - Real-time Chemical Lab Safety',
     description: 'Advanced air quality monitoring with ML predictions',
-    icons: {
-        icon: '/logo.jpg',
-    },
 }
 
 export default function RootLayout({
