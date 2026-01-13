@@ -71,7 +71,26 @@ app.prepare().then(() => {
             console.log('🤖 ML Predictions:', response.data)
             io.emit('predictions', response.data)
 
-            // Publish predictions to MQTT
+            // Publish predictions to MQTT - Individual topics for ESP32
+            // ESP32 subscribes to: pred_mq135, pred_mq2, pred_mq7
+            mqttClient.publish('net4think/lab_monitor/pred_mq135', JSON.stringify({
+                label: response.data.mq135.label,
+                confidence: response.data.mq135.confidence
+            }), { qos: 1 })
+
+            mqttClient.publish('net4think/lab_monitor/pred_mq2', JSON.stringify({
+                label: response.data.mq2.label,
+                confidence: response.data.mq2.confidence
+            }), { qos: 1 })
+
+            mqttClient.publish('net4think/lab_monitor/pred_mq7', JSON.stringify({
+                label: response.data.mq7.label,
+                confidence: response.data.mq7.confidence
+            }), { qos: 1 })
+
+            console.log('📤 Published predictions to individual topics')
+
+            // Also publish consolidated data
             const processedData = {
                 timestamp: new Date().toISOString(),
                 sensor_data: {
@@ -113,7 +132,25 @@ app.prepare().then(() => {
 
             io.emit('predictions', fallbackPredictions)
 
-            // Also publish fallback predictions
+            // Publish fallback predictions to individual topics for ESP32
+            mqttClient.publish('net4think/lab_monitor/pred_mq135', JSON.stringify({
+                label: fallbackPredictions.mq135.label,
+                confidence: fallbackPredictions.mq135.confidence
+            }), { qos: 1 })
+
+            mqttClient.publish('net4think/lab_monitor/pred_mq2', JSON.stringify({
+                label: fallbackPredictions.mq2.label,
+                confidence: fallbackPredictions.mq2.confidence
+            }), { qos: 1 })
+
+            mqttClient.publish('net4think/lab_monitor/pred_mq7', JSON.stringify({
+                label: fallbackPredictions.mq7.label,
+                confidence: fallbackPredictions.mq7.confidence
+            }), { qos: 1 })
+
+            console.log('📤 Published fallback predictions to individual topics')
+
+            // Also publish consolidated fallback data
             const fallbackData = {
                 timestamp: new Date().toISOString(),
                 sensor_data: data,
