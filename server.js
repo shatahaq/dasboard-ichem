@@ -4,6 +4,7 @@ const { parse } = require('url')
 const next = require('next')
 const { Server } = require('socket.io')
 const { getMqttClient, setMqttMessageCallback } = require('./lib/mqtt-client-cjs')
+const { initializeFCM, checkAndNotifyStatusChanges, registerToken, unregisterToken, getTokens } = require('./lib/fcm-service')
 const axios = require('axios')
 
 const dev = process.env.NODE_ENV !== 'production'
@@ -18,6 +19,49 @@ app.prepare().then(() => {
     const httpServer = createServer(async (req, res) => {
         try {
             const parsedUrl = parse(req.url, true)
+
+            // FCM API Endpoints
+            if (parsedUrl.pathname === '/api/fcm/register' && req.method === 'POST') {
+                let body = '';
+                req.on('data', chunk => { body += chunk.toString(); });
+                req.on('end', () => {
+                    try {
+                        const { token } = JSON.parse(body);
+                        const success = registerToken(token);
+                        res.writeHead(success ? 200 : 400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success, message: success ? 'Token registered' : 'Invalid token' }));
+                    } catch (e) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: false, message: 'Invalid request body' }));
+                    }
+                });
+                return;
+            }
+
+            if (parsedUrl.pathname === '/api/fcm/unregister' && req.method === 'POST') {
+                let body = '';
+                req.on('data', chunk => { body += chunk.toString(); });
+                req.on('end', () => {
+                    try {
+                        const { token } = JSON.parse(body);
+                        const success = unregisterToken(token);
+                        res.writeHead(success ? 200 : 404, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success, message: success ? 'Token unregistered' : 'Token not found' }));
+                    } catch (e) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: false, message: 'Invalid request body' }));
+                    }
+                });
+                return;
+            }
+
+            if (parsedUrl.pathname === '/api/fcm/tokens' && req.method === 'GET') {
+                const tokens = getTokens();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ tokens, count: tokens.length }));
+                return;
+            }
+
             await handle(req, res, parsedUrl)
         } catch (err) {
             console.error('Error occurred handling', req.url, err)
@@ -70,6 +114,9 @@ app.prepare().then(() => {
 
             console.log('🤖 ML Predictions:', response.data)
             io.emit('predictions', response.data)
+
+            // Check for status changes and send FCM notifications
+            await checkAndNotifyStatusChanges(response.data)
 
             // Publish predictions to MQTT - Individual topics for ESP32
             // ESP32 subscribes to: pred_mq135, pred_mq2, pred_mq7
@@ -161,6 +208,9 @@ app.prepare().then(() => {
         }
     })
 
+    // Initialize FCM service
+    initializeFCM();
+
     httpServer
         .once('error', (err) => {
             console.error(err)
@@ -171,5 +221,6 @@ app.prepare().then(() => {
             console.log('📡 MQTT client initialized')
             console.log('🔌 Socket.io ready for connections')
             console.log(`🤖 ML Service URL: ${ML_SERVICE_URL}`)
+            console.log('🔥 FCM service initialized')
         })
 })
