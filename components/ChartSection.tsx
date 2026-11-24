@@ -147,7 +147,7 @@ export default function ChartSection({ history }: ChartSectionProps) {
                             stroke="#f97316"
                             strokeWidth={2.5}
                             dot={false}
-                            name="Temperature (°C)"
+                            name="Temperature (deg C)"
                         />
                         <Line
                             type="monotone"

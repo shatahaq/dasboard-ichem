@@ -23,3 +23,7 @@ yarn-error.log*
 # Firebase & FCM
 firebase-admin-key.json
 fcm-tokens.json
+
+# Local deploy artifacts and private keys
+*.pem
+*.tar.gz

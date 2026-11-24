@@ -2,8 +2,13 @@
 import mqtt from 'mqtt'
 
 const MQTT_BROKER = process.env.MQTT_BROKER || 'broker.hivemq.com'
-const MQTT_PORT = parseInt(process.env.MQTT_PORT || '1883')
-const MQTT_TOPIC = 'net4think/lab_monitor/data'
+const MQTT_PORT = parseInt(process.env.MQTT_PORT || '1883', 10)
+export const MQTT_DATA_TOPIC = process.env.MQTT_DATA_TOPIC || 'net4think/lab_monitor/data'
+export const MQTT_PREDICTION_TOPICS = {
+    mq135: process.env.MQTT_PRED_MQ135_TOPIC || 'net4think/lab_monitor/pred_mq135',
+    mq2: process.env.MQTT_PRED_MQ2_TOPIC || 'net4think/lab_monitor/pred_mq2',
+    mq7: process.env.MQTT_PRED_MQ7_TOPIC || 'net4think/lab_monitor/pred_mq7'
+}
 
 let client: mqtt.MqttClient | null = null
 let messageCallback: ((data: any) => void) | null = null
@@ -19,12 +24,12 @@ export function getMqttClient() {
         })
 
         client.on('connect', () => {
-            console.log('✅ MQTT Connected')
-            client?.subscribe(MQTT_TOPIC, (err) => {
+            console.log('MQTT connected')
+            client?.subscribe(MQTT_DATA_TOPIC, (err) => {
                 if (err) {
-                    console.error('❌ MQTT Subscribe error:', err)
+                    console.error('MQTT subscribe error:', err)
                 } else {
-                    console.log(`📡 Subscribed to: ${MQTT_TOPIC}`)
+                    console.log(`Subscribed to MQTT topic: ${MQTT_DATA_TOPIC}`)
                 }
             })
         })
@@ -32,22 +37,22 @@ export function getMqttClient() {
         client.on('message', (topic, message) => {
             try {
                 const data = JSON.parse(message.toString())
-                console.log('📨 MQTT Message:', data)
+                console.log('MQTT message:', data)
 
                 if (messageCallback) {
                     messageCallback(data)
                 }
             } catch (error) {
-                console.error('❌ Error parsing MQTT message:', error)
+                console.error('Error parsing MQTT message:', error)
             }
         })
 
         client.on('error', (error) => {
-            console.error('❌ MQTT Error:', error)
+            console.error('MQTT error:', error)
         })
 
         client.on('close', () => {
-            console.log('⚠️ MQTT Disconnected')
+            console.log('MQTT disconnected')
         })
     }
 

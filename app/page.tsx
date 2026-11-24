@@ -2,20 +2,19 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Activity, Thermometer, Droplets, Wind, Flame, Skull, Leaf, Wifi, WifiOff } from 'lucide-react'
+import { Activity, Thermometer, Droplets, Wind, Flame, Skull, Leaf, Wifi, WifiOff, Server, Cpu } from 'lucide-react'
 import SensorCard from '@/components/SensorCard'
 import EnvironmentCard from '@/components/EnvironmentCard'
 import ChartSection from '@/components/ChartSection'
-import { io, Socket } from 'socket.io-client' // Added back for Proxy mode
-// import mqtt from 'mqtt' // Removed unused direct MQTT
+import { io, type Socket } from 'socket.io-client'
 import Image from 'next/image'
 
 interface SensorData {
-    temperature: number
-    humidity: number
-    mq135_ppm: number
-    mq2_ppm: number
-    mq7_ppm: number
+    temperature: number | null
+    humidity: number | null
+    mq135_ppm: number | null
+    mq2_ppm: number | null
+    mq7_ppm: number | null
     timestamp: string
 }
 
@@ -30,58 +29,128 @@ interface Predictions {
     mq7: Prediction
 }
 
+interface SystemStatus {
+    mqtt?: {
+        connected: boolean
+        broker: string
+        port: number
+        topic: string
+        lastEvent?: string | null
+        error?: string | null
+        lastEventAt?: string | null
+    }
+    sensor?: {
+        lastDataAt: string | null
+        ageMs: number | null
+        fresh: boolean
+        freshnessMs: number
+    }
+    ml?: {
+        available: boolean | null
+        lastCheckedAt: string | null
+    }
+}
+
+const waitingPrediction = { label: 'Menunggu...', confidence: 0 }
+
+const initialSensorData: SensorData = {
+    temperature: null,
+    humidity: null,
+    mq135_ppm: null,
+    mq2_ppm: null,
+    mq7_ppm: null,
+    timestamp: '-'
+}
+
+const initialPredictions: Predictions = {
+    mq135: waitingPrediction,
+    mq2: waitingPrediction,
+    mq7: waitingPrediction
+}
+
+function toFiniteNumber(value: unknown) {
+    if (value === null || value === undefined || value === '') {
+        return null
+    }
+
+    const number = Number(value)
+    return Number.isFinite(number) ? number : null
+}
+
+function formatTime(value: unknown) {
+    if (typeof value !== 'string') {
+        return new Date().toLocaleTimeString('id-ID', { hour12: false })
+    }
+
+    const date = new Date(value)
+    return Number.isNaN(date.getTime())
+        ? new Date().toLocaleTimeString('id-ID', { hour12: false })
+        : date.toLocaleTimeString('id-ID', { hour12: false })
+}
+
+function normalizePrediction(value: unknown): Prediction {
+    if (!value || typeof value !== 'object') {
+        return waitingPrediction
+    }
+
+    const prediction = value as Partial<Prediction>
+    const confidence = Number(prediction.confidence)
+
+    return {
+        label: typeof prediction.label === 'string' && prediction.label.trim()
+            ? prediction.label.trim()
+            : waitingPrediction.label,
+        confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(100, confidence)) : 0
+    }
+}
+
 export default function Dashboard() {
-    const [sensorData, setSensorData] = useState<SensorData>({
-        temperature: 0,
-        humidity: 0,
-        mq135_ppm: 0,
-        mq2_ppm: 0,
-        mq7_ppm: 0,
-        timestamp: '-'
-    })
-
-    const [predictions, setPredictions] = useState<Predictions>({
-        mq135: { label: 'Menunggu...', confidence: 0 },
-        mq2: { label: 'AMAN', confidence: 0 },
-        mq7: { label: 'NORMAL', confidence: 0 }
-    })
-
-    const [history, setHistory] = useState<any[]>([])
-    const [isConnected, setIsConnected] = useState(false)
+    const [sensorData, setSensorData] = useState<SensorData>(initialSensorData)
+    const [predictions, setPredictions] = useState<Predictions>(initialPredictions)
+    const [history, setHistory] = useState<SensorData[]>([])
+    const [socketConnected, setSocketConnected] = useState(false)
+    const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
 
     useEffect(() => {
-        // Fallback: Use Socket.io (Proxy) because direct MQTT (WSS) is blocked in this environment
         const socket: Socket = io()
 
         socket.on('connect', () => {
-            console.log('✅ Socket.io connected (Proxy Mode)')
-            setIsConnected(true)
+            console.log('Socket.io connected')
+            setSocketConnected(true)
         })
 
         socket.on('disconnect', () => {
-            console.log('❌ Socket.io disconnected')
-            setIsConnected(false)
+            console.log('Socket.io disconnected')
+            setSocketConnected(false)
+        })
+
+        socket.on('system_status', (status: SystemStatus) => {
+            setSystemStatus(status)
         })
 
         socket.on('sensor_data', (data: any) => {
-            console.log('📡 Received ESP32 data (via Proxy):', data)
+            console.log('Received ESP32 data:', data)
 
             const updatedData: SensorData = {
-                temperature: Number(data.temperature) || 0,
-                humidity: Number(data.humidity) || 0,
-                mq135_ppm: Number(data.mq135_ppm) || 0,
-                mq2_ppm: Number(data.mq2_ppm) || 0,
-                mq7_ppm: Number(data.mq7_ppm) || 0,
-                timestamp: new Date().toLocaleTimeString()
+                temperature: toFiniteNumber(data.temperature),
+                humidity: toFiniteNumber(data.humidity),
+                mq135_ppm: toFiniteNumber(data.mq135_ppm),
+                mq2_ppm: toFiniteNumber(data.mq2_ppm),
+                mq7_ppm: toFiniteNumber(data.mq7_ppm),
+                timestamp: formatTime(data.received_at)
             }
 
             setSensorData(updatedData)
-            setHistory(prev => [...prev.slice(-50), updatedData])
+            setHistory((prev) => [...prev.slice(-50), updatedData])
         })
 
-        socket.on('predictions', (preds: Predictions) => {
-            console.log('🤖 ML Predictions received:', preds)
-            setPredictions(preds)
+        socket.on('predictions', (preds: Partial<Predictions>) => {
+            console.log('ML predictions received:', preds)
+            setPredictions({
+                mq135: normalizePrediction(preds?.mq135),
+                mq2: normalizePrediction(preds?.mq2),
+                mq7: normalizePrediction(preds?.mq7)
+            })
         })
 
         return () => {
@@ -89,37 +158,81 @@ export default function Dashboard() {
         }
     }, [])
 
+    const mqttConnected = Boolean(systemStatus?.mqtt?.connected)
+    const sensorFresh = Boolean(systemStatus?.sensor?.fresh)
+    const mlAvailable = systemStatus?.ml?.available
+
+    const connectionState = (() => {
+        if (!socketConnected) {
+            return {
+                label: 'Dashboard Offline',
+                detail: 'Socket disconnected',
+                Icon: WifiOff,
+                textClass: 'text-red-600',
+                dotClass: 'bg-red-500'
+            }
+        }
+
+        if (!mqttConnected) {
+            return {
+                label: 'MQTT Offline',
+                detail: 'Broker not connected',
+                Icon: WifiOff,
+                textClass: 'text-red-600',
+                dotClass: 'bg-red-500'
+            }
+        }
+
+        if (!sensorFresh) {
+            return {
+                label: 'Waiting Sensor',
+                detail: 'No recent ESP32 data',
+                Icon: Activity,
+                textClass: 'text-amber-600',
+                dotClass: 'bg-amber-500 animate-pulse'
+            }
+        }
+
+        return {
+            label: 'Live',
+            detail: 'ESP32 data active',
+            Icon: Wifi,
+            textClass: 'text-brand-600',
+            dotClass: 'bg-brand-500 animate-pulse'
+        }
+    })()
+
+    const ConnectionIcon = connectionState.Icon
+
     return (
         <div className="min-h-screen">
-            {/* Professional Header */}
             <motion.header
                 initial={{ y: -100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 className="professional-header sticky top-0 z-50 backdrop-blur-sm bg-white/95"
             >
                 <div className="max-w-7xl mx-auto px-4 py-3 md:px-8 md:py-4">
-                    <div className="flex items-center justify-between">
-                        {/* Logo & Brand */}
-                        <div className="flex items-center gap-3 md:gap-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 md:gap-4 min-w-0">
                             <motion.div
                                 initial={{ scale: 0, rotate: -180 }}
                                 animate={{ scale: 1, rotate: 0 }}
-                                transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                                className="relative"
+                                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                                className="relative shrink-0"
                             >
                                 <div className="w-10 h-10 md:w-16 md:h-16 rounded-xl overflow-hidden bg-white border-2 border-brand-500 logo-glow">
                                     <Image
-                                        src="/logo.jpg"
+                                        src="/ichem-logo.jpg"
                                         alt="IC Lab Monitor"
                                         width={64}
                                         height={64}
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full object-contain p-1"
                                         priority
                                     />
                                 </div>
                             </motion.div>
 
-                            <div>
+                            <div className="min-w-0">
                                 <h1 className="text-lg md:text-3xl font-bold text-green-gradient leading-tight">
                                     I-Chem
                                 </h1>
@@ -129,55 +242,70 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        {/* Connection Status */}
                         <motion.div
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="status-badge px-3 py-1.5 md:px-4 md:py-2 rounded-lg"
+                            className="status-badge px-3 py-1.5 md:px-4 md:py-2 rounded-lg shrink-0"
+                            title={connectionState.detail}
                         >
                             <div className="flex items-center gap-2">
-                                {isConnected ? (
-                                    <>
-                                        <Wifi className="w-3 h-3 md:w-4 md:h-4 text-brand-500" />
-                                        <span className="text-xs md:text-sm font-semibold text-brand-600">Connected</span>
-                                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-brand-500 animate-pulse"></div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <WifiOff className="w-4 h-4 text-red-500" />
-                                        <span className="text-sm font-semibold text-red-600">Disconnected</span>
-                                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                    </>
-                                )}
+                                <ConnectionIcon className={`w-3.5 h-3.5 md:w-4 md:h-4 ${connectionState.textClass}`} />
+                                <span className={`text-xs md:text-sm font-semibold ${connectionState.textClass}`}>
+                                    {connectionState.label}
+                                </span>
+                                <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${connectionState.dotClass}`} />
                             </div>
                         </motion.div>
                     </div>
                 </div>
             </motion.header>
 
-            {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4 md:space-y-8">
-                {/* Info Banner */}
-                <motion.div
+                <motion.section
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                     className="professional-card rounded-xl p-4 md:p-6 border-l-4 border-brand-500"
                 >
-                    <div className="flex items-start gap-3">
-                        <div className="p-2 bg-brand-50 rounded-lg">
-                            <Activity className="w-5 h-5 text-brand-600" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-brand-50 rounded-lg">
+                                <Server className="w-5 h-5 text-brand-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500">MQTT Broker</p>
+                                <p className={`text-sm font-bold ${mqttConnected ? 'text-brand-700' : 'text-red-600'}`}>
+                                    {mqttConnected ? 'Connected' : 'Disconnected'}
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-sm md:text-lg font-bold text-gray-900 mb-1">Real-time Monitoring Active</h3>
-                            <p className="text-xs md:text-sm text-gray-600 leading-relaxed">
-                                Monitoring air quality with 3 ML-powered sensors for chemical lab safety
-                            </p>
+
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-50 rounded-lg">
+                                <Activity className="w-5 h-5 text-amber-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500">ESP32 Data</p>
+                                <p className={`text-sm font-bold ${sensorFresh ? 'text-brand-700' : 'text-amber-600'}`}>
+                                    {sensorFresh ? 'Receiving' : 'Waiting'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-50 rounded-lg">
+                                <Cpu className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500">ML Service</p>
+                                <p className={`text-sm font-bold ${mlAvailable === false ? 'text-amber-600' : 'text-brand-700'}`}>
+                                    {mlAvailable === false ? 'Fallback Active' : mlAvailable === true ? 'Online' : 'Waiting'}
+                                </p>
+                            </div>
                         </div>
                     </div>
-                </motion.div>
+                </motion.section>
 
-                {/* Sensor Predictions */}
                 <section>
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-brand-50 rounded-lg">
@@ -185,7 +313,7 @@ export default function Dashboard() {
                         </div>
                         <div>
                             <h2 className="text-2xl font-bold text-gray-900">Sensor Predictions</h2>
-                            <p className="text-sm text-gray-600">AI-powered air quality analysis</p>
+                            <p className="text-sm text-gray-600">Model output sent back to the ESP32 alert system</p>
                         </div>
                     </div>
 
@@ -217,7 +345,6 @@ export default function Dashboard() {
                     </div>
                 </section>
 
-                {/* Environment */}
                 <section>
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-brand-50 rounded-lg">
@@ -234,7 +361,7 @@ export default function Dashboard() {
                             icon={<Thermometer className="w-5 h-5" />}
                             label="Temperature"
                             value={sensorData.temperature}
-                            unit="°C"
+                            unit="deg C"
                             color="orange"
                         />
                         <EnvironmentCard
@@ -254,16 +381,14 @@ export default function Dashboard() {
                     </div>
                 </section>
 
-                {/* Charts */}
                 {history.length > 0 && (
                     <ChartSection history={history} />
                 )}
 
-                {/* Footer */}
                 <footer className="pt-8 pb-4 border-t border-gray-200">
                     <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
                         <Leaf className="w-4 h-4 text-brand-500" />
-                        <span>I-Chem © 2026 - Powered by Net4think</span>
+                        <span>I-Chem Copyright 2026 - Powered by Net4think</span>
                         <Leaf className="w-4 h-4 text-brand-500" />
                     </div>
                 </footer>

@@ -6,9 +6,17 @@ import { cn } from '@/lib/utils'
 interface EnvironmentCardProps {
     icon: React.ReactNode
     label: string
-    value: number | string
+    value: number | string | null
     unit: string
     color: 'orange' | 'blue' | 'green'
+}
+
+function formatValue(value: number | string | null) {
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value.toFixed(1) : '-'
+    }
+
+    return value || '-'
 }
 
 export default function EnvironmentCard({ icon, label, value, unit, color }: EnvironmentCardProps) {
@@ -71,7 +79,7 @@ export default function EnvironmentCard({ icon, label, value, unit, color }: Env
                             animate={{ scale: 1, opacity: 1 }}
                             className="text-3xl font-bold text-gray-900"
                         >
-                            {typeof value === 'number' ? value.toFixed(1) : value}
+                            {formatValue(value)}
                         </motion.span>
                         {unit && <span className="text-lg text-gray-500 font-medium">{unit}</span>}
                     </div>
